@@ -7,7 +7,7 @@
 package com.gyoomi.durain.basethread;
 
 /**
- * 类功能描述
+ * 使用多线程就是在使用异步
  *
  * @author Leon
  * @version 2018/8/7 20:58
