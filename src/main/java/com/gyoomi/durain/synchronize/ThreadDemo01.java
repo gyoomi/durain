@@ -382,14 +382,30 @@ class Thread0109 extends Thread {
 }
 
 // --------------------------------------------------------------------------------------------------------------
+
+/**
+ * 此实验说明：
+ *      当存在夫子继承关系，子类完全可以通过可重入锁，调用父类的同步方法。
+ *      代码运行结果：父子类都是同步执行了
+ *
+ */
 class Run0109 {
     public static void main(String[] args) {
+        MyThread0110 thread = new MyThread0110();
+        thread.start();
+    }
+}
 
+class MyThread0110 extends Thread {
+    @Override
+    public void run() {
+        Sub sub = new Sub();
+        sub.operateSubMethod();
     }
 }
 
 class Main {
-    private int i = 10;
+    public int i = 10;
     public synchronized void operateMainMethod() {
         try {
             i--;
@@ -403,10 +419,152 @@ class Main {
 
 class Sub extends Main {
     public synchronized void operateSubMethod() {
+        try {
+            while (i > 0) {
+                i--;
+                System.out.println("Sub print i = " + i);
+                Thread.sleep(1000);
+                this.operateMainMethod();
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+// --------------------------------------------------------
 
+/**
+ * 出现异常，锁自动释放
+ *
+ * 线程1出现异常，并释放了锁。线程2进入了方法，并正常的打印。
+ *
+ */
+class Run0110 {
+    public static void main(String[] args) {
+        try {
+            Service02 s = new Service02();
+            MyThrad0111 t1 = new MyThrad0111(s);
+            t1.setName("a");
+            t1.start();
+            Thread.sleep(500);
+            MyThrad0112 t2 = new MyThrad0112(s);
+            t2.setName("b");
+            t2.start();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class MyThrad0111 extends Thread {
+
+    private Service02 s;
+    public MyThrad0111(Service02 s) {
+        this.s = s;
+    }
+    @Override
+    public void run() {
+        super.run();
+        s.testMethod();
     }
 }
 
+class MyThrad0112 extends Thread {
 
+    private Service02 s;
+    public MyThrad0112(Service02 s) {
+        this.s = s;
+    }
+    @Override
+    public void run() {
+        super.run();
+        s.testMethod();
+    }
+}
+
+class Service02 {
+    public synchronized void testMethod() {
+        if (Thread.currentThread().getName().equals("a")) {
+            System.out.println("Thread a start. time = " + System.currentTimeMillis());
+            int i = 1;
+            while (i == 1) {
+                if (("" + Math.random()).substring(0, 8).equals("0.123456")) {
+                    System.out.println("Thread a occur error. time = " + System.currentTimeMillis());
+                    Integer.parseInt("a");
+                }
+            }
+        } else {
+            System.out.println("Thread b run. time = " + System.currentTimeMillis());
+        }
+    }
+}
+// ----------------------------------------------------------------------------------
+/**
+ * 同步不具继承性
+ *
+ * 同步不可以继承。
+ *
+ *
+ */
+class Run0113 {
+    public static void main(String[] args) {
+        Zi z = new Zi();
+        MyThread0115 t1 = new MyThread0115(z);
+        MyThread0116 t2 = new MyThread0116(z);
+        t1.setName("A");
+        t2.setName("B");
+        t1.start();
+        t2.start();
+    }
+}
+class MyThread0115 extends Thread {
+    private Zi zi;
+    public MyThread0115(Zi zi) {
+        this.zi = zi;
+    }
+
+    @Override
+    public void run() {
+        zi.serviceMethod();
+    }
+}
+
+class MyThread0116 extends Thread {
+    private Zi zi;
+    public MyThread0116(Zi zi) {
+        this.zi = zi;
+    }
+
+    @Override
+    public void run() {
+        zi.serviceMethod();
+    }
+}
+
+class Fu {
+    public synchronized void serviceMethod() {
+        try {
+            System.out.println("fu sleep start, Thread = " + Thread.currentThread().getName() + " time = " + System.currentTimeMillis());
+            Thread.sleep(5000);
+            System.out.println("fu sleep end, Thread = " + Thread.currentThread().getName() + " time = " + System.currentTimeMillis());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class Zi extends Fu {
+
+    @Override
+    public synchronized void serviceMethod() {
+        try {
+            System.out.println("zi sleep start, Thread = " + Thread.currentThread().getName() + " time = " + System.currentTimeMillis());
+            Thread.sleep(5000);
+            System.out.println("zi sleep end, Thread = " + Thread.currentThread().getName() + " time = " + System.currentTimeMillis());
+            super.serviceMethod();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
 
 
