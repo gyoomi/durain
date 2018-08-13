@@ -181,7 +181,7 @@ class MyThread0104 extends Thread {
  *        Thread B 添加了10个元素
  *        Thread A wait end   at 1534140491079
  *   结论：
- *       1）nofify不会立刻释放锁，而是等代码执行完后才会释放；
+ *       1）notify不会立刻释放锁，而是等代码执行完后才会释放；
  *       2）如果发出notify(),没有处于wait状态的线程，该命令将会被忽略
  *       3）notify()是唤醒一个，notifyAll()是唤醒所有
  *
@@ -258,5 +258,457 @@ class MyThread0106 extends Thread {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+    }
+}
+// --------------------------------------
+
+/**
+ * 1.4方法wait()释放锁notify()锁不释放
+ *
+ * 说明：当执行wait()方法时后，锁会被自动释放，而执行notify()方法，锁则不自动释放
+ *      该wait为sleep，则结果为顺序执行（同步效果）。
+ *
+ *      由此可以得出：
+ *      wait释放锁，sleep不释放锁。
+ *
+ *
+ */
+class Run0104 {
+    public static void main(String[] args) {
+        Object lock = new Object();
+        MyThread0107 t1 = new MyThread0107(lock);
+        MyThread0108 t2 = new MyThread0108(lock);
+        t1.start();
+        t2.start();
+    }
+}
+class MyService01 {
+    public void testMethod(Object lock) {
+        try {
+            synchronized (lock) {
+                System.out.println("begin wait");
+                // lock.wait();
+                Thread.sleep(4000);
+                System.out.println("end wait");
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class MyThread0107 extends Thread {
+    private Object lock;
+    public MyThread0107(Object lock) {
+        this.lock = lock;
+    }
+
+    @Override
+    public void run() {
+        MyService01 service = new MyService01();
+        service.testMethod(lock);
+    }
+}
+class MyThread0108 extends Thread {
+    private Object lock;
+    public MyThread0108(Object lock) {
+        this.lock = lock;
+    }
+
+    @Override
+    public void run() {
+        MyService01 service = new MyService01();
+        service.testMethod(lock);
+    }
+}
+// ----------------------------------------
+
+/**
+ * 1.5 当interrupt方法遇到wait方法
+ *
+ *     说明:
+ *         当线程处于wait状态，调用interrupt方法则会抛出InterruptException异常。
+ *     实例：
+ *
+ *     总结：
+ *         1.执行完同步代码块就会释放锁
+ *         2.在执行同步代码，如噶发生异常，锁也是会 被释放的
+ *         3.在执行同步代码块的过程中，如果执行了锁所属对象wait方法，则这个线程则会释放锁，进入阻塞队列等待被唤醒。
+ *
+ */
+class Run0105 {
+    public static void main(String[] args) throws InterruptedException {
+        Object lock = new Object();
+        MyThread0109  t1 = new MyThread0109(lock);
+        t1.start();
+        Thread.sleep(4000);
+        t1.interrupt();
+    }
+}
+class MyService02 {
+    public void testMethod(Object lock) {
+        try {
+            synchronized (lock) {
+                System.out.println("begin wait");
+                lock.wait();
+                System.out.println("end wait");
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            System.out.println("出现异常了，因为线程在wait状态下呗interrupt了");
+        }
+    }
+}
+class MyThread0109 extends Thread {
+    private Object lock;
+    public MyThread0109(Object lock) {
+        this.lock = lock;
+    }
+
+    @Override
+    public void run() {
+        MyService02 service = new MyService02();
+        service.testMethod(lock);
+    }
+}
+// ----------------------------------------------------
+
+/**
+ * 1.6 只通知一个线程
+ *
+ *     说明：调用notify()方法，一次只随机通知一个线程。
+ *     补充：如果多次调用notify().则会随机唤醒wait中的线程
+ *     实例：
+ *         结果：
+ *         thread = Thread-0 begin wait
+ *         thread = Thread-1 begin wait
+ *         thread = Thread-2 begin wait
+ *         thread = Thread-0 end   wait
+ *
+ */
+class Run0106 {
+    public static void main(String[] args) throws InterruptedException {
+        Object lock = new Object();
+        MyThread0110 t1 = new MyThread0110(lock);
+        MyThread0110 t2 = new MyThread0110(lock);
+        MyThread0110 t3 = new MyThread0110(lock);
+        t1.start();
+        t2.start();
+        t3.start();
+        Thread.sleep(2000);
+        MyThread0111 t = new MyThread0111(lock);
+        t.start();
+    }
+}
+class Service03 {
+    public void testMethod(Object lock) {
+        try {
+            synchronized (lock) {
+                System.out.println("thread = " + Thread.currentThread().getName() + " begin wait");
+                lock.wait();
+                System.out.println("thread = " + Thread.currentThread().getName() + " end   wait");
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class MyThread0110 extends Thread {
+    private Object lock;
+    public MyThread0110(Object lock) {
+        this.lock = lock;
+    }
+
+    @Override
+    public void run() {
+        Service03 service = new Service03();
+        service.testMethod(lock);
+    }
+}
+class MyThread0111 extends Thread {
+    private Object lock;
+    public MyThread0111(Object lock) {
+        this.lock = lock;
+    }
+
+    @Override
+    public void run() {
+        synchronized (lock) {
+            lock.notifyAll();
+        }
+    }
+}
+// ---------------------------------------------------
+
+/**
+ * 1.7 唤醒所有线程
+ *     说明：为了唤醒所有线程，可以使用notifyAll().
+ */
+class Run0107 {
+    public static void main(String[] args) {
+
+    }
+}
+// ---------------------------------------------------
+
+/**
+ * 1.9 方法wait(long)使用
+ *     说明：等待某一个时间内是否有线程对锁进行唤醒，如果超过时间自动唤醒
+ *
+ */
+class Run0108 {
+    public static void main(String[] args) throws InterruptedException {
+        final Object lock = new Object();
+        Runnable runnable1 = new Runnable() {
+            public void run() {
+                try {
+                    synchronized (lock) {
+                        System.out.println("wait begin at " + System.currentTimeMillis());
+                        lock.wait(5000);
+                        System.out.println("wait begin at " + System.currentTimeMillis());
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        Runnable runnable2 = new Runnable() {
+            public void run() {
+                synchronized (lock) {
+                    lock.notify();
+                }
+            }
+        };
+        Thread t1 = new Thread(runnable1);
+        t1.start();
+        Thread.sleep(3000);
+        Thread t2 = new Thread(runnable2);
+        t2.start();
+    }
+}
+// --------------------------------------------------
+
+/**
+ * 1.10 通知过早
+ *      说明：
+ *          如果通知过早，则会打乱程序的运行逻辑。
+ *      出现：wait状态的线程则会会一直处于等待中
+ *
+ */
+class Run0109 {
+    public static void main(String[] args) throws InterruptedException {
+        final Object lock = new Object();
+        Runnable r1 = new Runnable(){
+            public void run() {
+                try {
+                    synchronized (lock) {
+                        System.out.println("begin wait");
+                        lock.wait();
+                        System.out.println("end   wait");
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        };
+        Runnable r2 = new Runnable(){
+            public void run() {
+                synchronized (lock) {
+                    System.out.println("notify wait");
+                    lock.notify();
+                    System.out.println("notify wait");
+                }
+            }
+        };
+        Thread t1 = new Thread(r1);
+        Thread t2 = new Thread(r2);
+
+        t1.start();
+        Thread.sleep(1000);
+        t2.start();
+
+    }
+}
+// -------------------------------------------------
+
+/**
+ * 1.11 等待wait的条件发生变化
+ *      说明：
+ *          使用wait/notify模式时，还需要注意另外一种情况，那就是wait等待的条件发生了变化，也会造成程序逻辑的混乱。
+ *      实例：
+ *          发生indexOutOfBoundException
+ *      解决：把if改成while即可。
+ *
+ */
+class Run0110 {
+    public static void main(String[] args) throws InterruptedException {
+        Object lock = new Object();
+        Add add = new Add(lock);
+        Subtract subtract = new Subtract(lock);
+        MyThread0113 t1 = new MyThread0113(subtract);
+        MyThread0113 t2 = new MyThread0113(subtract);
+        t1.start();
+        t2.start();
+        Thread.sleep(1000);
+        MyThread0112 t = new MyThread0112(add);
+        t.start();
+    }
+}
+class ObjectValue {
+    public static List list = new ArrayList();
+}
+class Add {
+    private Object lock;
+    public Add(Object lock) {
+        this.lock = lock;
+    }
+    public void add() {
+        synchronized (lock) {
+            ObjectValue.list.add("anything");
+            lock.notifyAll();
+        }
+    }
+}
+class Subtract {
+    private Object lock;
+    public Subtract(Object lock) {
+        this.lock = lock;
+    }
+    public void sbutract() {
+        try {
+            synchronized (lock) {
+                while (ObjectValue.list.size() == 0) {
+                    System.out.println("thread = " + Thread.currentThread().getName() + " begin wait");
+                    lock.wait();
+                    System.out.println("thread = " + Thread.currentThread().getName() + " end   wait");
+                }
+                ObjectValue.list.remove(0);
+                System.out.println("list size = " + ObjectValue.list.size());
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class MyThread0112 extends Thread {
+    private Add add;
+    public MyThread0112(Add add) {
+        this.add = add;
+    }
+
+    @Override
+    public void run() {
+        add.add();
+    }
+}
+class MyThread0113 extends Thread {
+    private Subtract subtract;
+    public MyThread0113(Subtract subtract) {
+        this.subtract = subtract;
+    }
+
+    @Override
+    public void run() {
+        subtract.sbutract();
+    }
+}
+// ------------------------------------------------
+
+/**
+ * 1.12 生产者和消费者模式实现
+ *      基于wait/notify原理实现的
+ *
+ */
+class Run0111 {
+    public static void main(String[] args) {
+
+    }
+}
+// ---------------------------------------------
+
+/**
+ * 一生产者一消费者：操作者
+ * 代码如下:
+ *
+ *
+ *
+ */
+class Run0112 {
+    public static void main(String[] args) {
+        Object lock = new Object();
+        P11 p = new P11(lock);
+        C11 c = new C11(lock);
+        Thread0114 t1 = new Thread0114(p);
+        Thread0115 t2 = new Thread0115(c);
+        t1.start();
+        t2.start();
+    }
+}
+class ObjectValue11 {
+    public static String value = "";
+}
+class P11 {
+    private Object lock;
+    public P11(Object lock) {
+        this.lock = lock;
+    }
+    public void setValue() {
+        try {
+            synchronized (lock) {
+                if (!ObjectValue11.value.equals("")) {
+                    lock.wait();
+                }
+                String value = System.currentTimeMillis() + " " + System.nanoTime();
+                System.out.println("setValue = " + value);
+                ObjectValue11.value = value;
+                lock.notify();
+
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class C11 {
+    private Object lock;
+    public C11(Object lock) {
+        this.lock = lock;
+    }
+    public void getValue() {
+        try {
+            synchronized (lock) {
+                if (ObjectValue11.value.equals("")) {
+                    lock.wait();
+                }
+                System.out.println("getValue = " + ObjectValue11.value);
+                ObjectValue11.value = "";
+                lock.notify();
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class Thread0114 extends Thread {
+    private P11 p;
+    public Thread0114(P11 p) {
+        this.p = p;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            p.setValue();
+        }
+    }
+}
+class Thread0115 extends Thread {
+    private C11 c;
+    public Thread0115(C11 c) {
+        this.c = c;
+    }
+
+    @Override
+    public void run() {
+        c.getValue();
     }
 }
