@@ -1121,6 +1121,7 @@ class ReadThread extends Thread {
  *      实例：
  *
  *
+ *
  */
 class Run0119 {
     public static void main(String[] args) throws IOException, InterruptedException {
@@ -1190,5 +1191,74 @@ class CharReadThread extends Thread {
     @Override
     public void run() {
         readData.readChar(reader);
+    }
+}
+// ---------------------------------------
+
+/**
+ * 1.15 实战：等待/通知之交叉备份
+ *      代码如下：实现了a和b交叉备份
+ *
+ */
+class Run0120 {
+    public static void main(String[] args) {
+        DBTools tool = new DBTools();
+        for (int i = 0; i < 20; i++) {
+            Thread0120 t1 = new Thread0120(tool);
+            t1.start();
+            Thread0121 t2 = new Thread0121(tool);
+            t2.start();
+        }
+    }
+}
+class DBTools {
+    private volatile boolean prevIsA = false;
+
+    public synchronized void backupA() {
+        try {
+            while (prevIsA == true) {
+                this.wait();
+            }
+            System.out.println("backupA...");
+            prevIsA = true;
+            this.notifyAll();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public synchronized void backupB() {
+        try {
+            while (prevIsA == false) {
+                this.wait();
+            }
+            System.out.println("backupB...");
+            prevIsA = false;
+            this.notifyAll();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class Thread0120 extends Thread {
+    private DBTools dbTool;
+    public Thread0120(DBTools dbTool) {
+        this.dbTool = dbTool;
+    }
+
+    @Override
+    public void run() {
+        dbTool.backupA();
+    }
+}
+class Thread0121 extends Thread {
+    private DBTools dbTool;
+    public Thread0121(DBTools dbTool) {
+        this.dbTool = dbTool;
+    }
+
+    @Override
+    public void run() {
+        dbTool.backupB();
     }
 }
