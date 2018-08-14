@@ -6,6 +6,8 @@
 
 package com.gyoomi.durain.communicate;
 
+
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -627,7 +629,9 @@ class Run0111 {
 
 /**
  * 一生产者一消费者：操作者
- * 代码如下:
+ *     代码如下:
+ *     测试结果：
+ *         交替打印
  *
  *
  *
@@ -657,7 +661,7 @@ class P11 {
                 if (!ObjectValue11.value.equals("")) {
                     lock.wait();
                 }
-                String value = System.currentTimeMillis() + " " + System.nanoTime();
+                String value = System.currentTimeMillis() + "_" + System.nanoTime();
                 System.out.println("setValue = " + value);
                 ObjectValue11.value = value;
                 lock.notify();
@@ -691,6 +695,7 @@ class C11 {
 class Thread0114 extends Thread {
     private P11 p;
     public Thread0114(P11 p) {
+        super();
         this.p = p;
     }
 
@@ -704,11 +709,486 @@ class Thread0114 extends Thread {
 class Thread0115 extends Thread {
     private C11 c;
     public Thread0115(C11 c) {
+        super();
         this.c = c;
     }
 
     @Override
     public void run() {
-        c.getValue();
+        while (true) {
+            c.getValue();
+        }
+    }
+}
+// ----------------------------------------------
+
+/**
+ * 多生产者多消费者：操作值 - 假死
+ *
+ *     说明：
+ *         所谓“假死”现象就是线程进入了wait状态。如果所有的线程进入了wait状态，则整个项目则处于停滞。
+ *    分析：
+ *        出现假死主要使用为出现同类唤醒同类。
+ *
+ *    解决：
+ *        不光唤醒同类，将异类也一起唤醒。
+ *  多生产者多消费者：操作值
+ *    修改：
+ *    将notify()改为notifyAll()即可。
+ *
+ *
+ */
+class Run0113 {
+    public static void main(String[] args) throws InterruptedException {
+        Object lock = new Object();
+        P12 p = new P12(lock);
+        C12 c = new C12(lock);
+        Thread0116[] pArr = new Thread0116[2];
+        Thread0117[] cArr = new Thread0117[2];
+        for (int i = 0; i < 2; i++) {
+            pArr[i] = new Thread0116(p);
+            cArr[i] = new Thread0117(c);
+            pArr[i].setName("生产者" + (i + 1));
+            cArr[i].setName("消费者" + (i + 1));
+            pArr[i].start();
+            cArr[i].start();
+        }
+        Thread.sleep(5000);
+        System.out.println("---------------------------------------------------------");
+        Thread[] ts = new Thread[Thread.currentThread().getThreadGroup().activeCount()];
+        Thread.currentThread().getThreadGroup().enumerate(ts);
+        for (int i = 0; i < ts.length; i++) {
+            System.out.println(ts[i].getName() + ":" + ts[i].getState());
+        }
+    }
+}
+class ObjectValue12 {
+    public static String value = "";
+}
+class P12 {
+    private Object lock;
+    public P12(Object lock) {
+        this.lock = lock;
+    }
+    public void setValue() {
+        try {
+            synchronized (lock) {
+                while (!ObjectValue12.value.equals("")) {
+                    System.out.println("生产者" + Thread.currentThread().getName() + "wait...");
+                    lock.wait();
+                }
+                System.out.println("生产者" + Thread.currentThread().getName() + "running...");
+                String value = System.currentTimeMillis() + "_" + System.nanoTime();
+                ObjectValue12.value = value;
+                lock.notifyAll();
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class C12 {
+    private Object lock;
+    public C12(Object lock) {
+        this.lock = lock;
+    }
+    public void getValue() {
+        try {
+            synchronized (lock) {
+                while (ObjectValue12.value.equals("")) {
+                    System.out.println("消费者" + Thread.currentThread().getName() + "wait...");
+                    lock.wait();
+                }
+                System.out.println("消费者" + Thread.currentThread().getName() + "running...");
+                ObjectValue12.value = "";
+                lock.notifyAll();
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class Thread0116 extends Thread {
+    private P12 p;
+    public Thread0116(P12 p) {
+        this.p = p;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            p.setValue();
+        }
+    }
+}
+class Thread0117 extends Thread {
+    private C12 c;
+    public Thread0117(C12 c) {
+        this.c = c;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            c.getValue();
+        }
+    }
+}
+// ------------------------------------------
+/**
+ * 一生产者与一消费者：操作栈
+ *     说明：
+ *         使用生产者想堆栈List放入元素，使用消费者从List中取出元素。List的容量只有1。一个生产者一个消费者。
+ *
+ */
+class Run0114 {
+    public static void main(String[] args) {
+        MyStack stack = new MyStack();
+        P13 p = new P13(stack);
+        C13 c = new C13(stack);
+        Thread0118 t1 = new Thread0118(p);
+        Thread0119 t2 = new Thread0119(c);
+        t1.start();
+        t2.start();
+    }
+}
+class MyStack {
+    private List list = new ArrayList();
+    public synchronized void push() {
+        try {
+            while (list.size() == 1) {
+                this.wait();
+            }
+            System.out.println("thread = " + Thread.currentThread().getName() + "生产。。。");
+            list.add("any" + Math.random());
+            this.notifyAll();
+            System.out.println("push = " + list.size());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+    public synchronized String pop() {
+        String value = "";
+        try {
+            while (list.size() == 0) {
+                this.wait();
+            }
+            value = "" + list.get(0);
+            list.remove(0);
+            this.notifyAll();
+            System.out.println("thread = " + Thread.currentThread().getName() + "消费。。。");
+            System.out.println("pop = " + list.size());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return value;
+    }
+}
+class P13 {
+    private MyStack stack;
+    public P13(MyStack stack) {
+        this.stack = stack;
+    }
+
+    public void pushService() {
+        stack.push();
+    }
+
+}
+class C13 {
+    private MyStack stack;
+    public C13(MyStack stack) {
+        this.stack = stack;
+    }
+    public void popService() {
+        System.out.println("pop = " + stack.pop());
+    }
+}
+class Thread0118 extends Thread {
+    private P13 p;
+    public Thread0118(P13 p) {
+        this.p = p;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            p.pushService();
+        }
+    }
+}
+class Thread0119 extends Thread {
+    private C13 c;
+    public Thread0119(C13 c) {
+        this.c = c;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            c.popService();
+        }
+    }
+}
+// ------------------------------------------
+
+/**
+ * 一生产者与多消费者：操作栈  解决wait条件改变与假死
+ * 问题：
+ *     抛出异常：将if换成while
+ *     假死： notify()换成notifyAll()
+ *
+ *
+ */
+class Run0115 {
+    public static void main(String[] args) {
+        MyStack stack = new MyStack();
+        P13 p = new P13(stack);
+        C13 c = new C13(stack);
+        C13 c2 = new C13(stack);
+        C13 c3 = new C13(stack);
+        C13 c4 = new C13(stack);
+        C13 c5 = new C13(stack);
+        Thread0118 t1 = new Thread0118(p);
+        Thread0119 t2 = new Thread0119(c);
+        Thread0119 t3 = new Thread0119(c2);
+        Thread0119 t4 = new Thread0119(c3);
+        Thread0119 t5 = new Thread0119(c4);
+        Thread0119 t6 = new Thread0119(c5);
+        t1.start();
+        t2.start();
+        t3.start();
+        t4.start();
+        t5.start();
+        t6.start();
+    }
+}
+// -----------------------------------------
+/**
+ * 多生产者一消费者：操作栈
+ *
+ */
+class Run0116 {
+    public static void main(String[] args) {
+        MyStack stack = new MyStack();
+        P13 p = new P13(stack);
+        P13 p2 = new P13(stack);
+        P13 p3 = new P13(stack);
+        P13 p4 = new P13(stack);
+        P13 p5 = new P13(stack);
+        C13 c = new C13(stack);
+        Thread0118 t1 = new Thread0118(p);
+        Thread0118 t3 = new Thread0118(p2);
+        Thread0118 t4 = new Thread0118(p3);
+        Thread0118 t5 = new Thread0118(p4);
+        Thread0118 t6 = new Thread0118(p5);
+        Thread0119 t2 = new Thread0119(c);
+        t1.start();
+        t2.start();
+        t3.start();
+        t4.start();
+        t5.start();
+        t6.start();
+    }
+}
+// ----------------------------------------
+/**
+ * 多生产者多消费者：操作栈
+ *
+ */
+class Run0117 {
+    public static void main(String[] args) {
+        MyStack stack = new MyStack();
+        P13 p1 = new P13(stack);
+        P13 p2 = new P13(stack);
+        P13 p3 = new P13(stack);
+        P13 p4 = new P13(stack);
+        C13 c1 = new C13(stack);
+        C13 c2 = new C13(stack);
+        C13 c3 = new C13(stack);
+        C13 c4 = new C13(stack);
+        C13 c5 = new C13(stack);
+        Thread0118 pt1 = new Thread0118(p1);
+        Thread0118 pt2 = new Thread0118(p2);
+        Thread0118 pt3 = new Thread0118(p3);
+        Thread0118 pt4 = new Thread0118(p4);
+        Thread0119 ct1 = new Thread0119(c1);
+        Thread0119 ct2 = new Thread0119(c2);
+        Thread0119 ct3 = new Thread0119(c3);
+        Thread0119 ct4 = new Thread0119(c4);
+        Thread0119 ct5 = new Thread0119(c5);
+        pt1.start();
+        pt2.start();
+        pt3.start();
+        pt4.start();
+        ct1.start();
+        ct2.start();
+        ct3.start();
+        ct4.start();
+        ct5.start();
+    }
+}
+// -----------------------------------------
+
+/**
+ * 1.13 通过管道进行线程间通信：字节流
+ *      java中的管道流是一种特殊的流，用于在不同线程之间知己恩发送数据
+ *      说明：
+ *          一个线程发送数据到输出管道，另外一个线程从输入管道读取数据。通过管道实现线程间的通讯，无需借助其他临时性的文件。
+ *      java中有四个流是关于其的：
+ *          PipeInputStream PipeOutputStream
+ *          PipeWriter PipeReader
+ *      实例：
+ *          首先会会阻塞在读的方法，直到有数据，读取结束，退出线程。
+ *
+ */
+class Run0118 {
+    public static void main(String[] args) throws IOException, InterruptedException {
+        WriteData writeData = new WriteData();
+        ReadData readData = new ReadData();
+        PipedInputStream in = new PipedInputStream();
+        PipedOutputStream out = new PipedOutputStream();
+        in.connect(out);
+        WriteThread wt = new WriteThread(writeData, out);
+        ReadThread rt = new ReadThread(readData, in);
+        rt.start();
+        Thread.sleep(2000);
+        wt.start();
+    }
+}
+class WriteData {
+    public void writeData(PipedOutputStream out) {
+        try {
+            System.out.println("write：");
+            for (int i = 0; i < 300; i++) {
+                String data = "" + (i + 1);
+                out.write(data.getBytes());
+                System.out.print(data);
+            }
+            System.out.println();
+            out.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class ReadData {
+    public void readData(PipedInputStream in) {
+        try {
+            System.out.println("read：");
+            byte[] readArr = new byte[20];
+            int readLength = in.read(readArr);
+            while (readLength != -1) {
+                String newData = new String(readArr, 0, readLength);
+                System.out.print(newData);
+                readLength = in.read(readArr);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class WriteThread extends Thread {
+    private WriteData writeData;
+    private PipedOutputStream out;
+    public WriteThread(WriteData writeData, PipedOutputStream out) {
+        this.out = out;
+        this.writeData = writeData;
+    }
+
+    @Override
+    public void run() {
+        writeData.writeData(out);
+    }
+}
+class ReadThread extends Thread {
+    private ReadData readData;
+    private PipedInputStream in;
+    public ReadThread(ReadData readData, PipedInputStream in) {
+        this.readData = readData;
+        this.in = in;
+    }
+
+    @Override
+    public void run() {
+        readData.readData(in);
+    }
+}
+// ---------------------------------------
+
+/**
+ * 1.14 通过管道进行线程间的通信：字符流
+ *      实例：
+ *
+ *
+ */
+class Run0119 {
+    public static void main(String[] args) throws IOException, InterruptedException {
+        WriteData02 writeData = new WriteData02();
+        ReadData02 readData = new ReadData02();
+        PipedReader reader = new PipedReader();
+        PipedWriter writer = new PipedWriter();
+        reader.connect(writer);
+        CharWriteThread wt = new CharWriteThread(writeData, writer);
+        CharReadThread rt = new CharReadThread(readData, reader);
+        rt.start();
+        Thread.sleep(2000);
+        wt.start();
+    }
+}
+class WriteData02 {
+    public void writeChar(PipedWriter writer) {
+        try {
+            System.out.println("write：");
+            for (int i = 0; i < 300; i++) {
+                String data = "\r\n" + (i + 1);
+                writer.write(data);
+                System.out.print(data);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class ReadData02 {
+    public void readChar(PipedReader reader) {
+        try {
+            System.out.println("read：");
+            char[] charArr = new char[20];
+            int readLength = reader.read(charArr);
+            while (readLength != -1) {
+                String data = new String(charArr, 0, readLength);
+                System.out.println(data);
+                readLength = reader.read(charArr);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class CharWriteThread extends Thread {
+    private WriteData02 writeData;
+    private PipedWriter writer;
+    public CharWriteThread(WriteData02 writeData, PipedWriter writer) {
+        this.writeData = writeData;
+        this.writer = writer;
+    }
+
+    @Override
+    public void run() {
+        writeData.writeChar(writer);
+    }
+}
+class CharReadThread extends Thread {
+    private ReadData02 readData;
+    private PipedReader reader;
+    public CharReadThread(ReadData02 readData, PipedReader reader) {
+        this.readData = readData;
+        this.reader = reader;
+    }
+
+    @Override
+    public void run() {
+        readData.readChar(reader);
     }
 }
