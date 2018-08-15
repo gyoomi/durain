@@ -484,7 +484,7 @@ class Run0108 {
         t1.start();
         Thread.sleep(3000);
         Thread t2 = new Thread(runnable2);
-        t2.start();
+        // t2.start();
     }
 }
 // --------------------------------------------------
