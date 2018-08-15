@@ -127,4 +127,174 @@ class Thread0205 extends Thread {
         t.interrupt();
     }
 }
+// ---------------------------------
+/**
+ * 2.4 方法join(long)的使用
+ *     设置一定时长的等待
+ *
+ *     实例：
+ *         主线程只等待子线程2秒。
+ *     并且此时t.join(2000);和Thread.sleep(2000);等价。
+ *     但是其实二者还是有区别的。具体区别看下节。
+ */
+class Run0203 {
+    public static void main(String[] args) throws InterruptedException {
+        Thread0206 t = new Thread0206();
+        t.start();
+        // t.join(2000);
+        Thread.sleep(2000);
+        System.out.println(" end time at " + System.currentTimeMillis());
+    }
+}
+class Thread0206 extends Thread {
+    @Override
+    public void run() {
+        try {
+            System.out.println(" begin start at " + System.currentTimeMillis());
+            Thread.sleep(5000);
+            System.out.println("end end end at" + System.currentTimeMillis());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+// --------------------------------
+
+/**
+ * 2.5 方法join(long)和sleep(long)的区别
+ *     join(long)：其实底层使用的是wait(long)实现的。
+ *     sleep(long)：sleep不会释放锁。
+ *     实例：
+ *         测试sleep()不会释放锁的实验。
+ *     打印：
+ *         run begin start = 1534322854747
+ *         >分析：在start之后，有两秒的时间b对象锁是被线程Thread0208持有的，并且是sleep，锁不能释放
+ *         bService run = 1534322856748
+ *         run begin end   = 1534322857748
+ *     结论：Thread.sleep()不释放锁。
+ *     实例：
+ *         使用join()
+ *     结论：
+ *         join()会立刻释放锁
+ *
+ */
+class Run0204 {
+    public static void main(String[] args) {
+        try {
+            Thread0207 b = new Thread0207();
+            Thread0208 t1 = new Thread0208(b);
+            Thread0209 t2 = new Thread0209(b);
+            t1.start();
+            Thread.sleep(1000);
+            t2.start();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class Thread0207 extends Thread {
+    @Override
+    public void run() {
+        try {
+            System.out.println("run begin start = " + System.currentTimeMillis());
+            Thread.sleep(3000);
+            System.out.println("run begin end   = " + System.currentTimeMillis());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public synchronized void bService() {
+        System.out.println("bService run = " + System.currentTimeMillis());
+    }
+}
+class Thread0208 extends Thread {
+    private Thread0207 b;
+    public Thread0208(Thread0207 b) {
+        this.b = b;
+    }
+
+    @Override
+    public void run() {
+        try {
+            synchronized (b) {
+                b.start();
+                // Thread.sleep(2000);
+                b.join(); // 如果改成join(),则会立刻释放锁。
+                for (int i = 0; i < Integer.MAX_VALUE; i++) {
+                    Math.random();
+                }
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class Thread0209 extends Thread {
+    private Thread0207 b;
+    public Thread0209(Thread0207 b) {
+        this.b = b;
+    }
+
+    @Override
+    public void run() {
+        b.bService();
+    }
+}
+// ----------------------------------
+
+/**
+ * 2.6 - 2.7 方法join()后面的代码提前运行：出现意外/解释意外
+ *
+ *
+ */
+class Run0205 {
+    public static void main(String[] args) {
+        try {
+            Thread0210 b = new Thread0210();
+            Thread0211 a = new Thread0211(b);
+            a.start();
+            b.start();
+            b.join(2000);
+            System.out.println("main end time = " + System.currentTimeMillis());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class Thread0210 extends Thread {
+    @Override
+    public synchronized void run() {
+        try {
+            System.out.println(" B begin thread = " + Thread.currentThread().getName() + " time = " + System.currentTimeMillis());
+            Thread.sleep(5000);
+            System.out.println(" B end   thread = " + Thread.currentThread().getName() + " time = " + System.currentTimeMillis());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+class Thread0211 extends Thread {
+    private Thread0210 b;
+    public Thread0211(Thread0210 b) {
+        this.b = b;
+    }
+
+    @Override
+    public void run() {
+        try {
+            synchronized (b) {
+                System.out.println("A begin thread = " + Thread.currentThread().getName() + " time = " + System.currentTimeMillis());
+                Thread.sleep(5000);
+                System.out.println("A end   thread = " + Thread.currentThread().getName() + " time = " + System.currentTimeMillis());
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+
+
 
