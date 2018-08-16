@@ -266,16 +266,454 @@ class Thread0105 extends Thread {
 // -----------------------------------------
 /**
  * 1.5 使用多个Condition实现通知部门线程：错误用法
- *
+ *     一个condition就类似于sync
+ *     那多个condition怎么处理
  */
 class Run0104 {
-    public static void main(String[] args) {
-
+    public static void main(String[] args) throws InterruptedException {
+        MyService0105 service = new MyService0105();
+        Thread0106 t1 = new Thread0106(service);
+        Thread0107 t2 = new Thread0107(service);
+        t1.start();
+        t2.start();
+        Thread.sleep(3000);
+        service.signAll();
     }
 }
+class MyService0105 {
+    private ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    public void awaitA() {
+        try {
+            lock.lock();
+            System.out.println("begin awaitA at = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+            condition.await();
+            System.out.println("end   awaitA at = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+    public void awaitB() {
+        try {
+            lock.lock();
+            System.out.println("begin awaitB at = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+            condition.await();
+            System.out.println("end   awaitB at = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
 
+    public void signAll() {
+        try {
+            lock.lock();
+            System.out.println("signAll all at = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+            condition.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+class Thread0106 extends Thread {
+    private MyService0105 service;
+    public Thread0106(MyService0105 service) {
+        this.service = service;
+    }
 
+    @Override
+    public void run() {
+        service.awaitA();
+    }
+}
+class Thread0107 extends Thread {
+    private MyService0105 service;
+    public Thread0107(MyService0105 service) {
+        this.service = service;
+    }
 
+    @Override
+    public void run() {
+        service.awaitB();
+    }
+}
+// -----------------------------------------
+/**
+ *  1.6 使用多个condition实现通知部分线程：正确用法
+ *      结论：
+ *          使用ReentrantLock可以根据不同的种类，唤醒不同类的线程。
+ *
+ */
+class Run0105 {
+    public static void main(String[] args) throws InterruptedException {
+        MyService0106 service = new MyService0106();
+        Thread0108 t1 = new Thread0108(service);
+        Thread0109 t2 = new Thread0109(service);
+        t1.start();
+        t2.start();
+        Thread.sleep(3000);
+        service.signall_B();
+    }
+}
+class MyService0106 {
+    private ReentrantLock lock = new ReentrantLock();
+    private Condition conditionA = lock.newCondition();
+    private Condition conditionB = lock.newCondition();
+    public void awaitA() {
+        try {
+            lock.lock();
+            System.out.println("begin awaitA time = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+            conditionA.await();
+            System.out.println("end   awaitA time = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+    public void awaitB() {
+        try {
+            lock.lock();
+            System.out.println("begin awaitB time = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+            conditionB.await();
+            System.out.println("end   awaitB time = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+    public void signall_A() {
+        try {
+            lock.lock();
+            System.out.println("signall_A time = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+            conditionA.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+    public void signall_B() {
+        try {
+            lock.lock();
+            System.out.println("signall_B time = " + System.currentTimeMillis() + " ThreadName = " + Thread.currentThread().getName());
+            conditionB.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+class Thread0108 extends Thread {
+    private MyService0106 service;
+    public Thread0108(MyService0106 service) {
+        this.service = service;
+    }
+
+    @Override
+    public void run() {
+        service.awaitA();
+    }
+}
+class Thread0109 extends Thread {
+    private MyService0106 service;
+    public Thread0109(MyService0106 service) {
+        this.service = service;
+    }
+
+    @Override
+    public void run() {
+        service.awaitB();
+    }
+}
+// ----------------------------------------
+/**
+ * 1.7 实现生产者/消费者：一对一交替打印
+ *
+ *
+ */
+class Run0106 {
+    public static void main(String[] args) {
+        MyService0107 service = new MyService0107();
+        Thread0110 t1 = new Thread0110(service);
+        Thread0111 t2 = new Thread0111(service);
+        t1.start();
+        t2.start();
+    }
+}
+class MyService0107 extends Thread {
+    private ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    private boolean hasSetValue = false;
+    public void set() {
+        try {
+            lock.lock();
+            if (hasSetValue == true) {
+                condition.await();
+            }
+            System.out.println("set★");
+            hasSetValue = true;
+            condition.signal();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+    public void get() {
+        try {
+            lock.lock();
+            if (hasSetValue == false) {
+                condition.await();
+            }
+            System.out.println("get☆");
+            hasSetValue = false;
+            condition.signal();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+class Thread0110 extends Thread {
+    private MyService0107 service;
+    public Thread0110(MyService0107 service) {
+        this.service = service;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            service.set();
+        }
+    }
+}
+class Thread0111 extends Thread {
+    private MyService0107 service;
+    public Thread0111(MyService0107 service) {
+        this.service = service;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            service.get();
+        }
+    }
+}
+// ----------------------------------------
+/**
+ * 1.8 实现生产者/消费者：多对多交替打印
+ *     注意if和while的区别
+ *     注意理解MyService0108中的代码
+ *
+ */
+class Run0107 {
+    public static void main(String[] args) {
+        MyService0108 service = new MyService0108();
+        Thread0112[] setArr = new Thread0112[10];
+        Thread0113[] getArr = new Thread0113[10];
+        for (int i = 0; i < 10; i++) {
+            setArr[i] = new Thread0112(service);
+            setArr[i].start();
+            getArr[i] = new Thread0113(service);
+            getArr[i].start();
+        }
+    }
+}
+class MyService0108 {
+    private ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    private boolean hasSetValue = false;
+
+    public void set() {
+        try {
+            lock.lock();
+            while (hasSetValue) {
+                System.out.println("有可能连续 ★★");
+                condition.await();
+            }
+            System.out.println("set ★");
+            hasSetValue = true;
+            condition.signalAll();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+    public void get() {
+        try {
+            lock.lock();
+            while (!hasSetValue) {
+                System.out.println("有可能连续 ☆☆");
+                condition.await();
+            }
+            System.out.println("get ☆");
+            hasSetValue = false;
+            condition.signalAll();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+class Thread0112 extends Thread {
+    private MyService0108 service;
+    public Thread0112(MyService0108 service) {
+        this.service = service;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            service.set();
+        }
+    }
+}
+class Thread0113 extends Thread {
+    private MyService0108 service;
+    public Thread0113(MyService0108 service) {
+        this.service = service;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            service.get();
+        }
+    }
+}
+// --------------------------------------
+/**
+ * 1.9 公平锁和非公平锁
+ *     说明：
+ *         锁Lock分为公平锁和非公平锁。所谓公平锁，就是表示线程获取锁的顺序按照线程加锁的顺序来分配的。即先来先得的FIFO的先进先出的顺序来的。
+ *         而非公平锁是一种获取锁的抢占机制，是随机获取锁的，这一点和公平锁不一样。
+ *
+ *     示例：
+ *          可以看出公平锁的启动时间和获取锁的时间基本上一致的。基本上有序的。
+ *     示例2：基本乱序。可以看出。
+ */
+class Run0108 {
+    public static void main(String[] args) {
+        final MyService0109 service = new MyService0109(true);
+        Runnable runnable = new Runnable(){
+            public void run() {
+                System.out.println("ThreadName = " + Thread.currentThread().getName() + " 运行了");
+                service.seviceMethod();
+            }
+        };
+        Thread[] arr = new Thread[10];
+        for (int i = 0; i < 10; i++) {
+            arr[i] = new Thread(runnable);
+            arr[i].start();
+        }
+    }
+}
+class Run0109 {
+    public static void main(String[] args) {
+        final MyService0109 service = new MyService0109(false);
+        Runnable runnable = new Runnable(){
+            public void run() {
+                System.out.println("ThreadName = " + Thread.currentThread().getName() + " 运行了");
+                service.seviceMethod();
+            }
+        };
+        Thread[] arr = new Thread[10];
+        for (int i = 0; i < 10; i++) {
+            arr[i] = new Thread(runnable);
+            arr[i].start();
+        }
+    }
+}
+class MyService0109 {
+    private ReentrantLock lock;
+    public MyService0109(boolean isFair) {
+        lock = new ReentrantLock(isFair);
+    }
+    public void seviceMethod() {
+        try {
+            lock.lock();
+            System.out.println("ThreadName = " + Thread.currentThread().getName() + " 获得了锁定");
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+// -------------------------------------
+
+/**
+ * 1.10 方法getHoldCount()、getQueueLength()、getWaitQueueLength()方法测试
+ *      1）getHoldCount()作用是查询当前线程保持此锁定的个数，也就是调用lock()方法的次数
+ *      2）getQueueLength()作用是返回正等待获取此锁定线程的估计数，比如说有5个线程，一个线程首先执行await(),
+ *         那么调用getQueueLength就会返回4.说明有四个线程正在同时等待lock锁的释放
+ *      3)getWaitQueueLength()
+ *
+ */
+class Run0110 {
+    public static void main(String[] args) {
+        MyService0110 service = new MyService0110();
+        service.serviceMethod2();
+    }
+}
+class MyService0110 {
+    private ReentrantLock lock = new ReentrantLock();
+    public void serviceMethod1() {
+        try {
+            lock.lock();
+            System.out.println("serviceMethod1 getHoldCount = " + lock.getHoldCount());
+            serviceMethod2();
+        } finally {
+            lock.unlock();
+        }
+    }
+    public void serviceMethod2() {
+        try {
+            lock.lock();
+            System.out.println("serviceMethod2 getHoldCount = " + lock.getHoldCount());
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+class Run0111 {
+    public static void main(String[] args) throws InterruptedException {
+        final MyService0111 service = new MyService0111();
+        Runnable runnable = new Runnable(){
+            public void run() {
+                service.serviceMethod1();
+            }
+        };
+        Thread[] arr = new Thread[10];
+        for (int i = 0; i < 10; i++) {
+            arr[i] = new Thread(runnable);
+        }
+        for (int i = 0; i < 10; i++) {
+            arr[i].start();
+        }
+        Thread.sleep(2000);
+        System.out.println("等待获取锁的线程数是： " + service.lock.getQueueLength());
+    }
+}
+class MyService0111 {
+    public ReentrantLock lock = new ReentrantLock();
+    public void serviceMethod1() {
+        try {
+            lock.lock();
+            System.out.println("ThreadName = " + Thread.currentThread().getName() + " 进入了方法！");
+            Thread.sleep(Integer.MAX_VALUE);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+}
 
 
 
