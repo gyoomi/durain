@@ -6,6 +6,8 @@
 
 package com.gyoomi.durain.lock;
 
+import java.util.Calendar;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -645,13 +647,14 @@ class MyService0109 {
     }
 }
 // -------------------------------------
-
 /**
  * 1.10 方法getHoldCount()、getQueueLength()、getWaitQueueLength()方法测试
  *      1）getHoldCount()作用是查询当前线程保持此锁定的个数，也就是调用lock()方法的次数
  *      2）getQueueLength()作用是返回正等待获取此锁定线程的估计数，比如说有5个线程，一个线程首先执行await(),
  *         那么调用getQueueLength就会返回4.说明有四个线程正在同时等待lock锁的释放
- *      3)getWaitQueueLength()
+ *      3)int getWaitQueueLength(Condition)作用是返回等待和此锁定相关给定条件Condition的线程估计数。
+ *         比如说有5个线程，每个线程都执行了同一个condition对象的await()方法，此时调用此方法的返回值将是5.
+ *
  *
  */
 class Run0110 {
@@ -714,6 +717,368 @@ class MyService0111 {
     }
 
 }
+class Run0112 {
+    public static void main(String[] args) throws InterruptedException {
+        final MyService0112 service = new MyService0112();
+        Runnable runnable = () -> service.awaitMethod();
+        Thread[] threadArr = new Thread[10];
+        for (int i = 0; i < 10; i++) {
+            threadArr[i] = new Thread(runnable);
+        }
+        for (int i = 0; i < 10; i++) {
+            threadArr[i].start();
+        }
+        Thread.sleep(2000);
+        service.signalMethod();
+        service.signalMethod();
+    }
+}
+class MyService0112 {
+    private ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    public void awaitMethod() {
+        try {
+            lock.lock();
+            condition.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+    public void signalMethod() {
+        try {
+            lock.lock();
+            System.out.println("有" + lock.getWaitQueueLength(condition) + "个线程正在等待condition对象");
+            condition.signal();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+// ------------------------------------
+/**
+ * 1.11 hasQueuedThread()、hasQueuedThreads()和hasWaiters()测试
+ *      说明：
+ *          1）boolean hasQueuedThread(Thread)查询指定线程是否在等待获取此锁定？
+ *          2）boolean hasQueuedThreads()查询是否有线程等待获取此锁定
+ *      结果：
+ *          false
+ *          true
+ *          true
+ *
+ *          3）boolean hasWaiters(Condition)作用是查询是否有线程正在等待与此锁定有关的condition条件
+ */
+class Run0113 {
+    public static void main(String[] args) throws InterruptedException {
+        final MyService0113 service = new MyService0113();
+        Runnable runnable = () -> service.waitMethod();
+        Thread a = new Thread(runnable);
+        a.start();
+        Thread.sleep(500);
+        Thread b = new Thread(runnable);
+        b.start();
+        Thread.sleep(500);
+        System.out.println(service.lock.hasQueuedThread(a));
+        System.out.println(service.lock.hasQueuedThread(b));
+        System.out.println(service.lock.hasQueuedThreads());
+    }
+}
+class MyService0113 {
+    public ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    public void waitMethod() {
+        try {
+            lock.lock();
+            Thread.sleep(Integer.MAX_VALUE);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+class Run0114 {
+    public static void main(String[] args) throws InterruptedException {
+        final MyService0114 service = new MyService0114();
+        Runnable runnable = () -> service.waitMethod();
+        Thread[] arr = new Thread[10];
+        for (int i = 0; i < 10; i++) {
+            arr[i] = new Thread(runnable);
+        }
+        for (int i = 0; i < 10; i++) {
+            arr[i].start();
+        }
+        Thread.sleep(2000);
+        service.signalMethod();
+    }
+}
+class MyService0114 {
+    public ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    public void waitMethod() {
+        try {
+            lock.lock();
+            condition.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+    public void signalMethod() {
+        try {
+            lock.lock();
+            System.out.println("有没有线程在等待condition？" + lock.hasWaiters(condition) + " 线城数是多少" + lock.getWaitQueueLength(condition));
+            condition.signal();
+        } finally {
+            lock.unlock();
+        }
+
+    }
+}
+// ----------------------------------
+/**
+ * 1.12 方法isFair()、isHeldByCurrentThread()和isLocked测试
+ *      1）isFair()判断是不是公平锁
+ *         默认情况下：ReentrantLock是非公平锁
+ *      2)boolean isHeldByCurrentThread()作用查询当前线程是否保持锁定。
+ *      3)boolean isLocked()查询此锁定是否被任意线程所保持
+ *
+ */
+class Run0115 {
+    public static void main(String[] args) {
+        final MyService0115 service1 = new MyService0115(true);
+        Runnable runnable = () -> service1.serviceMethod();
+        Thread a = new Thread(runnable);
+        a.start();
+        final MyService0115 service2 = new MyService0115(false);
+        Runnable runnable2 = () -> service2.serviceMethod();
+        Thread b = new Thread(runnable2);
+        b.start();
+    }
+}
+class MyService0115 {
+    private ReentrantLock lock;
+    public MyService0115(boolean isFair) {
+        lock = new ReentrantLock(isFair);
+    }
+    public void serviceMethod() {
+        try {
+            lock.lock();
+            System.out.println("公平锁情况：" + lock.isFair());
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+class Run0116 {
+    public static void main(String[] args) {
+        MyService0116 service = new MyService0116(false);
+        Runnable runnable = () -> service.serviceMethod();
+        Thread t = new Thread(runnable);
+        t.start();
+    }
+}
+class MyService0116 {
+    private ReentrantLock lock;
+    public MyService0116(boolean fair) {
+        lock = new ReentrantLock(fair);
+    }
+    public void serviceMethod() {
+        try {
+            System.out.println(lock.isLocked());
+            lock.lock();
+            System.out.println(lock.isLocked());
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+// ---------------------------------
+/**
+ * 1.13 方法lockInterruptibly()、tryLock()和tryLock(long timeout, TimeUnit unit)的测试
+ *      1)lockInterruptibly()的作用是：如果当前线程未被中断，则获取锁定；如果已被中断，则抛出异常。
+ *      2)boolean tryLock():仅在调用时锁定未被另一个线程保持的情况下，才获取该锁定。
+ *        Acquires the lock only if it is not held by another thread at the time of invocation
+ *      3）tryLock(long timeout, TimeUnit unit)
+ *         如果锁定在给定时间内，没有被另外的线程保持，且当年线程并未中断，则获取该锁定。
+ *
+ */
+class Run0117 {
+    public static void main(String[] args) throws InterruptedException {
+        MyService0117 service = new MyService0117();
+        Runnable runnable = () -> service.serviceMethod();
+        Thread t1 = new Thread(runnable);
+        t1.setName("A");
+        t1.start();
+        Thread.sleep(500);
+        Thread t2 = new Thread(runnable);
+        t2.setName("B");
+        t2.start();
+        // t2.interrupt(); // 打标记
+        t2.interrupt(); // 此时便会抛出异常
+        System.out.println("main end");
+    }
+}
+class MyService0117 {
+    private ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    public void serviceMethod() {
+        try {
+            lock.lockInterruptibly();
+            System.out.println("lock begin threadName " + Thread.currentThread().getName());
+            for (int i = 0; i < Integer.MAX_VALUE / 10; i++) {
+                Math.random();
+            }
+            System.out.println("lock end   threadName " + Thread.currentThread().getName());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+}
+class Run0118 {
+    public static void main(String[] args) {
+        final MyService0118 service = new MyService0118();
+        Runnable runnable = () -> service.testMethod();
+        Thread t1 = new Thread(runnable);
+        t1.setName("AAA");
+        t1.start();
+        Thread t2 = new Thread(runnable);
+        t2.setName("BBB");
+        t2.start();
+    }
+}
+class MyService0118 {
+    private ReentrantLock lock = new ReentrantLock();
+    public void testMethod() {
+        if (lock.tryLock()) {
+            System.out.println(Thread.currentThread().getName() + "获得锁");
+        } else {
+            System.out.println(Thread.currentThread().getName() + "没有获得锁");
+        }
+    }
+}
+class Run0119 {
+    public static void main(String[] args) {
+        final MyService0119 service = new MyService0119();
+        Runnable runnable = () -> {
+            System.out.println(Thread.currentThread().getName() + "调用了testMethod方法 time = " + System.currentTimeMillis());
+            service.testMethod();
+        };
+        Thread t1 = new Thread(runnable);
+        t1.setName("AAA");
+        t1.start();
+        Thread t2 = new Thread(runnable);
+        t2.setName("BBB");
+        t2.start();
+    }
+}
+class MyService0119 {
+    private ReentrantLock lock = new ReentrantLock();
+    public void testMethod() {
+        try {
+            if (lock.tryLock(3, TimeUnit.SECONDS)) {
+                System.out.println("time = " + System.currentTimeMillis() + " " + Thread.currentThread().getName() + "获取了锁");
+            } else  {
+                System.out.println("time = " + System.currentTimeMillis() + " " + Thread.currentThread().getName() + "没有获取了锁");
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+// ---------------------------------
+/**
+ * 1.14 方法awaitUninterruptibly()的使用
+ *      现象描述：
+ *      使用condition.await(),如果线程在执行的过程的被interrupt的话，会抛出异常
+ *      而使用condition.awaitUninterruptibly()则会正常运行，不会抛出异常。
+ */
+class Run0120 {
+    public static void main(String[] args) throws InterruptedException {
+        final MyService0120 service = new MyService0120();
+        Runnable runnable = () -> service.testMethod();
+        Thread t = new Thread(runnable);
+        t.start();
+        Thread.sleep(2_000);
+        t.interrupt();
+    }
+}
+class MyService0120 {
+    private ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    public void testMethod() {
+        try {
+            lock.lock();
+            System.out.println("wait begin");
+            // condition.awaitUninterruptibly();
+            condition.await();
+            System.out.println("wait  end");
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+// --------------------------------
+/**
+ * 1.15 方法awaitUntil()方法的使用
+ *      awaitUntil(Date) 到时间会自动醒来。
+ *      如果在此时间之前被signAll.线程也会醒来。
+ *
+ */
+class Run0121 {
+    public static void main(String[] args) throws InterruptedException {
+        MyService0121 service = new MyService0121();
+        Runnable runnable = () -> service.waitMethod();
+        Thread t1 = new Thread(runnable);
+        t1.start();
+        Runnable runnable2 = () -> service.notifyMethod();
+        Thread t2 = new Thread(runnable2);
+        Thread.sleep(2000);
+        t2.start();
+    }
+}
+class MyService0121 {
+    private ReentrantLock lock = new ReentrantLock();
+    private Condition condition = lock.newCondition();
+    public void waitMethod() {
+        try {
+            Calendar now = Calendar.getInstance();
+            now.add(Calendar.SECOND, 10);
+            lock.lock();
+            System.out.println("wait begin time = " + System.currentTimeMillis());
+            condition.awaitUntil(now.getTime());
+            System.out.println("wait end   time = " + System.currentTimeMillis());
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
+        }
+    }
+    public void notifyMethod() {
+        try {
+            lock.lock();
+            System.out.println("notify begin time = " + System.currentTimeMillis());
+            condition.signalAll();
+            System.out.println("notify   end time = " + System.currentTimeMillis());
+        } finally {
+            lock.unlock();
+        }
+    }
+}
+
+
+
+
+
+
 
 
 
